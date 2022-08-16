@@ -122,7 +122,7 @@ bool cInverter::query(const char *cmd, int replysize) {
                 lprintf("INVERTER: %s read timeout", cmd);
                 break;
             } else {
-                usleep(10);
+                usleep(5);
                 continue;
             }
         }

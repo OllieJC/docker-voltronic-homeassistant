@@ -1,50 +1,36 @@
 version: '3'
 
+# use start.sh and stop.sh to run as it'll set the variables
+
 services:
-  voltronic-mqtt:
+  mqtt:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
 
-    # We're now (finally) supporting Multi-Arch builds (via Github actions) on Docker Hub!
-    image: bushrangers/ha-voltronic-mqtt
+    container_name: "${CONTAINER_NAME}"
 
-    # Uncomment if you want to build your own local version.
-    #build:
-    #  context: .
-    #  dockerfile: Dockerfile.dev
-
-
-    container_name: voltronic-mqtt
-
-    privileged: true
+    privileged: false
     restart: always
 
     volumes:
         - ./config/:/etc/inverter/
 
     devices:
-    #  - "/dev/mem:/dev/mem"
-
-    # USB Port Mapping
-      - /dev/bus/usb:/dev/bus/usb:rwm
-      - /dev/ttyUSB0:/dev/ttyUSB0:rwm
-      - /dev/ttyUSB1:/dev/ttyUSB1:rwm
-
-    # Serial Port Mapping...
-      - /dev/ttyS0:/dev/ttyS0
-      - /dev/ttyS1:/dev/ttyS1
-      - /dev/ttyS2:/dev/ttyS2
+      - "${DEVICE}:${DEVICE}"
 
   # Used to auto-update images as we release new versions...
-  watchtower:
+#  watchtower:
     # Please see the following for configuration options:
     #    https://containrrr.github.io/watchtower/container-selection/
-    image: containrrr/watchtower
-    container_name: watchtower
+#    image: containrrr/watchtower
+#    container_name: watchtower
 
-    restart: always
-    privileged: true
+#    restart: always
+#    privileged: true
 
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+#    volumes:
+#      - /var/run/docker.sock:/var/run/docker.sock
 
-    command: --interval 500
+#    command: --interval 500
 

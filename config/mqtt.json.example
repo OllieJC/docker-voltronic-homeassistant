@@ -1,10 +1,11 @@
 {
-    "server": "[HA_MQTT_IP]",
+    "server": "[MQTT_HOST]",
     "port": "1883",
     "topic": "homeassistant",
-    "devicename": "voltronic",
-    "username": "",
-    "password": "",
+    "devicename": "Iconica_5kW",
+    "username": "[MQTT_USERNAME]",
+    "password": "[MQTT_PASSWORD]",
+	"clientid": "voltronic_bd8041d0cdf131a6ba4e5b3360b8bc5a",
     "influx": {
         "enabled": "false",
         "host": "http://[INFLUX_IP_OR_URL]:8086", 

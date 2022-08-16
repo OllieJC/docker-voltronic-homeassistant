@@ -1,24 +1,30 @@
 FROM debian:stretch
 
-RUN apt update && apt install -y \
+RUN apt update && apt upgrade -y && apt install -y \
         curl \
         git \
         build-essential \
         cmake \
         jq \
-        mosquitto-clients
+        mosquitto-clients \
+        less \
+        nano \
+        setserial
 
-ADD sources/ /opt/
+ADD sources/inverter-cli/ /opt/inverter-cli/
 ADD config/ /etc/inverter/
 
 RUN cd /opt/inverter-cli && \
     mkdir bin && cmake . && make && mv inverter_poller bin/
 
+ADD sources/healthcheck /opt/
+ADD sources/inverter-mqtt/ /opt/inverter-mqtt/
+
 HEALTHCHECK \
-    --interval=30s \
-    --timeout=10s \
-    --start-period=1m \
-    --retries=3 \
+    --interval=20s \
+    --timeout=3s \
+    --start-period=60s \
+    --retries=2 \
   CMD /opt/healthcheck
 
 WORKDIR /opt

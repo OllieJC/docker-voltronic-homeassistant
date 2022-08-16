@@ -50,8 +50,13 @@ It's pretty straightforward, just clone down the sources and set the configurati
 
 ```bash
 # Clone down sources on the host you want to monitor...
-git clone https://github.com/ned-kelly/docker-voltronic-homeassistant.git /opt/ha-inverter-mqtt-agent
+git clone https://github.com/OllieJC/docker-voltronic-homeassistant.git /opt/ha-inverter-mqtt-agent
 cd /opt/ha-inverter-mqtt-agent
+
+# if you install elsewhere, you may need to edit start/stop.sh
+
+# Configure the 'container_name=' directive (in docker.conf)... 
+vi config/docker.conf
 
 # Configure the 'device=' directive (in inverter.conf) to suit for RS232 or USB.. 
 vi config/inverter.conf
@@ -65,15 +70,8 @@ vi config/mqtt.json
 Then, plug in your Serial or USB cable to the Inverter & stand up the container:
 
 ```bash
-docker-compose up -d
-
+./start.sh
 ```
-
-_**Note:**_
-
-  - builds on docker hub are currently for `linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/386` -- If you have issues standing up the image on your Linux distribution (i.e. An old Pi/ARM device) you may need to manually build the image to support your local device architecture - This can be done by uncommenting the build flag in your docker-compose.yml file.
-  
-  - The default `docker-compose.yml` file includes Watchtower, which can be  configured to auto-update this image when we push new changes to github - Please **uncomment if you wish to auto-update to the latest builds of this project**.
 
 ## Integrating into Home Assistant.
 
