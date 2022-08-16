@@ -49,12 +49,16 @@ pushInfluxData () {
     INFLUX_DEVICE=$(echo "$MQTT_JSON" | jq '.influx.device' -r)
     INFLUX_PREFIX=$(echo "$MQTT_JSON" | jq '.influx.prefix' -r)
     INFLUX_DATABASE=$(echo "$MQTT_JSON" | jq '.influx.database' -r)
-5    INFLUX_MEASUREMENT_NAME=$(echo "$MQTT_JSON" | jq '.influx.namingMap.'$1'' -r)
+    INFLUX_MEASUREMENT_NAME=$(echo "$MQTT_JSON" | jq '.influx.namingMap.'$1'' -r)
 
     curl -i -XPOST "$INFLUX_HOST/write?db=$INFLUX_DATABASE&precision=s" -u "$INFLUX_USERNAME:$INFLUX_PASSWORD" --data-binary "$INFLUX_PREFIX,device=$INFLUX_DEVICE $INFLUX_MEASUREMENT_NAME=$2"
 }
 
-INVERTER_DATA=`timeout 7 /opt/inverter-cli/bin/inverter_poller -1`
+INVERTER_DATA=$(timeout 10 /opt/inverter-cli/bin/inverter_poller -1)
+
+if [ -z "$INVERTER_DATA" ]; then
+  exit 1
+fi
 
 #####################################################################################
 
@@ -65,6 +69,15 @@ Inverter_mode=$(echo "$INVERTER_DATA" | jq '.Inverter_mode' -r)
  # 1 = Power_On, 2 = Standby, 3 = Line, 4 = Battery, 5 = Fault, 6 = Power_Saving, 7 = Unknown
 
 [ -n "$Inverter_mode" ] && pushMQTTData "Inverter_mode" "$Inverter_mode" ""
+
+QPIGS_raw=$(echo "$INVERTER_DATA" | jq '.QPIGS_raw' -r)
+[ -n "$QPIGS_raw" ] && pushMQTTData "QPIGS_raw" "$QPIGS_raw" ""
+
+QPIRI_raw=$(echo "$INVERTER_DATA" | jq '.QPIRI_raw' -r)
+[ -n "$QPIRI_raw" ] && pushMQTTData "QPIRI_raw" "$QPIRI_raw" ""
+
+Q1_raw=$(echo "$INVERTER_DATA" | jq '.Q1_raw' -r)
+[ -n "$Q1_raw" ] && pushMQTTData "Q1_raw" "$Q1_raw" ""
 
 AC_grid_voltage=`echo $INVERTER_DATA | jq '.AC_grid_voltage' -r`
 [ ! -z "$AC_grid_voltage" ] && pushMQTTData "AC_grid_voltage" "$AC_grid_voltage" ""
@@ -86,6 +99,9 @@ PV_in_current=`echo $INVERTER_DATA | jq '.PV_in_current' -r`
 
 PV_in_watts=`echo $INVERTER_DATA | jq '.PV_in_watts' -r`
 [ ! -z "$PV_in_watts" ] && pushMQTTData "PV_in_watts" "$PV_in_watts" ""
+
+PV_charging_power=$(echo $INVERTER_DATA | jq '.PV_charging_power' -r)
+[ -n "$PV_charging_power" ] && pushMQTTData "PV_charging_power" "$PV_charging_power" ""
 
 PV_in_watthour=`echo $INVERTER_DATA | jq '.PV_in_watthour' -r`
 [ ! -z "$PV_in_watthour" ] && pushMQTTData "PV_in_watthour" "$PV_in_watthour" ""
@@ -131,6 +147,12 @@ SCC_charge_on=`echo $INVERTER_DATA | jq '.SCC_charge_on' -r`
 
 AC_charge_on=`echo $INVERTER_DATA | jq '.AC_charge_on' -r`
 [ ! -z "$AC_charge_on" ] && pushMQTTData "AC_charge_on" "$AC_charge_on" "binary_sensor"
+
+Floating_mode=$(echo "$INVERTER_DATA" | jq '.Floating_mode' -r)
+[ -n "$Floating_mode" ] && pushMQTTData "Floating_mode" "$Floating_mode" "binary_sensor"
+
+Switch_on=$(echo "$INVERTER_DATA" | jq '.Switch_on' -r)
+[ -n "$Switch_on" ] && pushMQTTData "Switch_on" "$Switch_on" "binary_sensor"
 
 Battery_recharge_voltage=`echo $INVERTER_DATA | jq '.Battery_recharge_voltage' -r`
 [ ! -z "$Battery_recharge_voltage" ] && pushMQTTData "Battery_recharge_voltage" "$Battery_recharge_voltage" ""

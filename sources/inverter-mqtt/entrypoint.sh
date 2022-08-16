@@ -43,7 +43,7 @@ fi
 # watch -n 30 /opt/inverter-mqtt/mqtt-push.sh > /dev/null 2>&1
 if [[ -z "$(pgrep -f 'watch.*mqtt-push')" ]]; then
   echo "mqtt-push not running, starting..."
-  watch -n 8 /opt/inverter-mqtt/mqtt-push.sh > /dev/null 2>&1
+  watch -n 10 /opt/inverter-mqtt/mqtt-push.sh > /dev/null 2>&1
 else
   echo "mqtt-push.sh is already running"
 fi

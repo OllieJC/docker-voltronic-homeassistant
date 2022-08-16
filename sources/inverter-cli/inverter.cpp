@@ -11,6 +11,7 @@ cInverter::cInverter(std::string devicename) {
     device = devicename;
     status1[0] = 0;
     status2[0] = 0;
+    status3[0] = 0;
     warnings[0] = 0;
     mode = 0;
 }
@@ -25,6 +26,13 @@ string *cInverter::GetQpigsStatus() {
 string *cInverter::GetQpiriStatus() {
     m.lock();
     string *result = new string(status2);
+    m.unlock();
+    return result;
+}
+
+string *cInverter::GetQOneStatus() {
+    m.lock();
+    string *result = new string(status3);
     m.unlock();
     return result;
 }
@@ -62,31 +70,10 @@ int cInverter::GetMode() {
     return result;
 }
 
-#define HEX(x) (x < 10 ? ('0' + x) : ('a' + x - 10))
-char *cInverter::escape_strn(unsigned char *str, int n) {
-    int j=0;
-
-    for (int i=0; i<n; i++) {
-	if (isprint(str[i]))
-	    escaped_buf[j++] = str[i];
-	else {
-	    unsigned char x1 = str[i] >> 4;
-	    unsigned char x2 = str[i] & 0x0f;
-	    escaped_buf[j++] = '\\';
-	    escaped_buf[j++] = 'x';
-	    escaped_buf[j++] = HEX(x1);
-	    escaped_buf[j++] = HEX(x2);
-	}
-    }
-
-    escaped_buf[j] = '\0';
-    return escaped_buf;
-}
-
 bool cInverter::query(const char *cmd) {
     time_t started;
     int fd;
-    int i=0, n, write_failed=0;
+    int i=0, n;
 
     fd = open(this->device.data(), O_RDWR | O_NONBLOCK);
     if (fd == -1) {
@@ -120,7 +107,7 @@ bool cInverter::query(const char *cmd) {
     uint16_t crc = cal_crc_half((uint8_t*)cmd, strlen(cmd));
     n = strlen(cmd);
     memcpy(&buf, cmd, n);
-    lprintf("INVERTER: %s: command CRC: %X %X", cmd, crc >> 8, crc & 0xff);
+    lprintf("INVERTER: Current CRC: %X %X", crc >> 8, crc & 0xff);
 
     buf[n++] = crc >> 8;
     buf[n++] = crc & 0xff;
@@ -137,19 +124,18 @@ bool cInverter::query(const char *cmd) {
 	// I don't know of any 6 (+ 2*CRC + '\r') byte commands to test it on
 	// but this at least gets it to return NAK.
 	if (towrite == 1) towrite = 2;
-        lprintf("INVERTER: %s: write offset %d, writing %d", cmd, offset, towrite);
+        //lprintf("DEBUG: offset %d, writing %d", offset, towrite);
 	ssize_t written = write(fd, &buf[offset], towrite);
 	if (written > 0)
 	    offset += written;
 	else {
-	    lprintf("INVERTER: %s: write failed (written=%d, errno=%d: %s)", cmd, written, errno, strerror(errno));
-	    write_failed=1;
+	    lprintf("INVERTER: command write failed (written=%d, errno=%d: %s)", written, errno, strerror(errno));
 	    break;
 	}
-        lprintf("INVERTER: %s: %d bytes to write, %d bytes written", cmd, n, offset);
+        //lprintf("DEBUG: %d bytes to write, %d bytes written", n, offset);
     }
 
-    // reads tend to be in multiple of 8 chars with NULL padding as necessary
+    // char *startbuf = 0;
     char *startbuf = (char *)&buf[0];
     char *endbuf = 0;
     time(&started);
@@ -157,7 +143,7 @@ bool cInverter::query(const char *cmd) {
         n = read(fd, &buf[i], 120-i);
         if (n < 0) {
             if (time(NULL) - started > 4) {
-                lprintf("INVERTER: %s: read timeout", cmd);
+                lprintf("INVERTER: %s read timeout", cmd);
                 break;
             } else {
                 usleep(5);
@@ -165,56 +151,49 @@ bool cInverter::query(const char *cmd) {
             }
         }
 
-	endbuf = (char *)memrchr((void *)&buf[i], 0x0d, n);
+        //i += n;
+	//startbuf = (char *)&buf[0];
+	//endbuf = strchr(startbuf, '\r');
+        endbuf = (char *)memrchr((void *)&buf[i], 0x0d, n);
         i += n;
     } while (endbuf == NULL);
     close(fd);
     buf[i] = '\0';
 
-    lprintf("INVERTER: %s: %d bytes in reply: %s", cmd, i, escape_strn(buf, i));
+    if (endbuf != NULL) {
+        int replysize = endbuf - startbuf + 1;
 
-    if (write_failed) {
-	return false;
-    }
-    else if (i < 3) {
-        lprintf("INVERTER: %s: reply too short (%d bytes)", cmd, i);
-	return false;
-    }
-    else if (endbuf == NULL) {
-        lprintf("INVERTER: %s: couldn't find reply <cr>: %s", cmd, buf);
-	return false;
-    }
+        lprintf("INVERTER: %s reply size (%d bytes)", cmd, i);
 
-    int replysize = endbuf - startbuf + 1;
-
-    // proper response, check CRC
-    if (buf[0]=='(' && buf[replysize-1]==0x0d) {
-        if (!(CheckCRC(buf, replysize))) {
-            lprintf("INVERTER: %s: CRC failed!", cmd);
+        if (buf[0]!='(' || buf[replysize-1]!=0x0d) {
+            lprintf("INVERTER: %s: incorrect start/stop bytes.  Buffer: %s", cmd, buf);
             return false;
         }
-	replysize -= 3;
-        buf[replysize] = '\0'; // null terminating on first CRC byte
-    }
-    else {
-        lprintf("INVERTER: %s: incorrect start/stop bytes", cmd);
+        if (!(CheckCRC(buf, replysize))) {
+            lprintf("INVERTER: %s: CRC Failed!  Reply size: %d  Buffer: %s", cmd, replysize, buf);
+            return false;
+        }
+
+        buf[replysize-3] = '\0'; // null terminating on first CRC byte
+        lprintf("INVERTER: %s: %d bytes read: %s", cmd, i, buf);
+
+        lprintf("INVERTER: %s query finished", cmd);
+        return true;
+    } else {
+        lprintf("INVERTER: %s couldn't find reply <cr> (%d bytes)", cmd, i);
         return false;
     }
-
-    lprintf("INVERTER: %s: %d bytes in payload", cmd, replysize);
-    lprintf("INVERTER: %s: query finished", cmd);
-    return true;
 }
 
 void cInverter::poll() {
     int n,j;
-    extern const int qpiri, qpiws, qmod, qpigs;
+    // extern const int qpiri, qpiws, qmod, qpigs;
 
     while (true) {
 
         // Reading mode
         if (!ups_qmod_changed) {
-            if (query("QMOD", qmod) && strcmp((char *)&buf[1], "NAK") != 0) {
+            if (query("QMOD")) {
                 SetMode(buf[1]);
                 ups_qmod_changed = true;
             }
@@ -222,7 +201,7 @@ void cInverter::poll() {
 
         // reading status (QPIGS)
         if (!ups_qpigs_changed) {
-            if (query("QPIGS", qpigs) && strcmp((char *)&buf[1], "NAK") != 0) {
+            if (query("QPIGS")) {
                 m.lock();
                 strcpy(status1, (const char*)buf+1);
                 m.unlock();
@@ -232,7 +211,7 @@ void cInverter::poll() {
 
         // Reading QPIRI status
         if (!ups_qpiri_changed) {
-            if (query("QPIRI", qpiri) && strcmp((char *)&buf[1], "NAK") != 0) {
+            if (query("QPIRI")) {
                 m.lock();
                 strcpy(status2, (const char*)buf+1);
                 m.unlock();
@@ -240,9 +219,19 @@ void cInverter::poll() {
             }
         }
 
+        // Reading Q1 status
+        if (!ups_qone_changed) {
+            if (query("Q1")) {
+                m.lock();
+                strcpy(status3, (const char*)buf+1);
+                m.unlock();
+                ups_qone_changed = true;
+            }
+        }
+
         // Get any device warnings...
         if (!ups_qpiws_changed) {
-            if (query("QPIWS", qpiws) && strcmp((char *)&buf[1], "NAK") != 0) {
+            if (query("QPIWS")) {
                 m.lock();
                 strcpy(warnings, (const char*)buf+1);
                 m.unlock();
@@ -254,7 +243,7 @@ void cInverter::poll() {
     }
 }
 
-void cInverter::ExecuteCmd(const string cmd, int replylen) {
+void cInverter::ExecuteCmd(const string cmd) {
     // Sending any command raw
     if (query(cmd.data())) {
         m.lock();

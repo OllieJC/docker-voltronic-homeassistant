@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-# exit
+exit
 
 INSTALL_PATH="/opt/ha-inverter-mqtt-agent"
 
