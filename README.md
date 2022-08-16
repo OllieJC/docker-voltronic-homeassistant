@@ -64,6 +64,7 @@ vi config/inverter.conf
 # Configure your MQTT server's IP/Host Name, Port, Credentials, HA topic, and name of the Inverter that you want displayed in Home Assistant...
 # If your MQTT server does not need a username/password just leave these values empty.
 
+cp config/mqtt.json.example config/mqtt.json
 vi config/mqtt.json
 ```
 
