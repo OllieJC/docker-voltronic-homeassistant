@@ -7,16 +7,12 @@
 #include "main.h"
 #include <termios.h>
 
-cInverter::cInverter(std::string devicename, int qpiri, int qpiws, int qmod, int qpigs) {
+cInverter::cInverter(std::string devicename) {
     device = devicename;
     status1[0] = 0;
     status2[0] = 0;
     warnings[0] = 0;
     mode = 0;
-    qpiri = qpiri;
-    qpiws = qpiws;
-    qmod = qmod;
-    qpigs = qpigs;
 }
 
 string *cInverter::GetQpigsStatus() {
@@ -64,6 +60,27 @@ int cInverter::GetMode() {
 
     m.unlock();
     return result;
+}
+
+#define HEX(x) (x < 10 ? ('0' + x) : ('a' + x - 10))
+char *cInverter::escape_strn(unsigned char *str, int n) {
+    int j=0;
+
+    for (int i=0; i<n; i++) {
+	if (isprint(str[i]))
+	    escaped_buf[j++] = str[i];
+	else {
+	    unsigned char x1 = str[i] >> 4;
+	    unsigned char x2 = str[i] & 0x0f;
+	    escaped_buf[j++] = '\\';
+	    escaped_buf[j++] = 'x';
+	    escaped_buf[j++] = HEX(x1);
+	    escaped_buf[j++] = HEX(x2);
+	}
+    }
+
+    escaped_buf[j] = '\0';
+    return escaped_buf;
 }
 
 bool cInverter::query(const char *cmd) {
@@ -197,7 +214,7 @@ void cInverter::poll() {
 
         // Reading mode
         if (!ups_qmod_changed) {
-            if (query("QMOD", qmod)) {
+            if (query("QMOD", qmod) && strcmp((char *)&buf[1], "NAK") != 0) {
                 SetMode(buf[1]);
                 ups_qmod_changed = true;
             }
@@ -205,7 +222,7 @@ void cInverter::poll() {
 
         // reading status (QPIGS)
         if (!ups_qpigs_changed) {
-            if (query("QPIGS", qpigs)) {
+            if (query("QPIGS", qpigs) && strcmp((char *)&buf[1], "NAK") != 0) {
                 m.lock();
                 strcpy(status1, (const char*)buf+1);
                 m.unlock();
@@ -215,7 +232,7 @@ void cInverter::poll() {
 
         // Reading QPIRI status
         if (!ups_qpiri_changed) {
-            if (query("QPIRI", qpiri)) {
+            if (query("QPIRI", qpiri) && strcmp((char *)&buf[1], "NAK") != 0) {
                 m.lock();
                 strcpy(status2, (const char*)buf+1);
                 m.unlock();
@@ -225,7 +242,7 @@ void cInverter::poll() {
 
         // Get any device warnings...
         if (!ups_qpiws_changed) {
-            if (query("QPIWS", qpiws)) {
+            if (query("QPIWS", qpiws) && strcmp((char *)&buf[1], "NAK") != 0) {
                 m.lock();
                 strcpy(warnings, (const char*)buf+1);
                 m.unlock();
@@ -239,7 +256,7 @@ void cInverter::poll() {
 
 void cInverter::ExecuteCmd(const string cmd, int replylen) {
     // Sending any command raw
-    if (query(cmd.data(), replylen)) {
+    if (query(cmd.data())) {
         m.lock();
         strcpy(status2, (const char*)buf+1);
         m.unlock();
