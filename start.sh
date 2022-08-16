@@ -5,6 +5,11 @@ set -e
 
 INSTALL_PATH="/opt/ha-inverter-mqtt-agent"
 
+if [[ ! -f "${INSTALL_PATH}/config/mqtt.json" ]]; then
+  echo "${INSTALL_PATH}/config/mqtt.json not found, check it exists and that the INSTALL_PATH in start.sh is correct"
+  exit 1
+fi
+
 CONTAINER_NAME=$(grep -Ei "^container_name=" "${INSTALL_PATH}/config/docker.conf" | cut -c16- | tr -d "\n")
 if [[ -z "$CONTAINER_NAME" ]]; then
   echo "container_name not found in config/docker.conf, exiting!"
