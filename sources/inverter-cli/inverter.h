@@ -35,7 +35,7 @@ class cInverter {
         string *GetWarnings();
 
         int GetMode();
-        void ExecuteCmd(const std::string cmd, int);
+        void ExecuteCmd(const std::string cmd);
 };
 
 #endif // ___INVERTER_H
