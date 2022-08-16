@@ -44,7 +44,6 @@ string devicename;
 int runinterval;
 float ampfactor;
 float wattfactor;
-int qpiri, qpiws, qmod, qpigs;
 
 // ---------------------------------------
 
@@ -90,14 +89,6 @@ void getSettingsFile(string filename) {
                     attemptAddSetting(&ampfactor, linepart2);
                 else if(linepart1 == "watt_factor")
                     attemptAddSetting(&wattfactor, linepart2);
-                else if(linepart1 == "qpiri")
-                    attemptAddSetting(&qpiri, linepart2);
-                else if(linepart1 == "qpiws")
-                    attemptAddSetting(&qpiws, linepart2);
-                else if(linepart1 == "qmod")
-                    attemptAddSetting(&qmod, linepart2);
-                else if(linepart1 == "qpigs")
-                    attemptAddSetting(&qpigs, linepart2);
                 else
                     continue;
             }
@@ -179,27 +170,11 @@ int main(int argc, char* argv[]) {
     }
 
     bool ups_status_changed(false);
-    ups = new cInverter(devicename,qpiri,qpiws,qmod,qpigs);
+    ups = new cInverter(devicename);
 
     // Logic to send 'raw commands' to the inverter..
     if (!rawcmd.empty()) {
-        int replylen;
-        if (!strcmp(rawcmd.c_str(), "QPI"))
-            replylen = 8;
-        else if (!strcmp(rawcmd.c_str(), "QID"))
-            replylen = 18;
-        else if (!strcmp(rawcmd.c_str(), "QVFW"))
-            replylen = 18;
-        else if (!strcmp(rawcmd.c_str(), "QVFW2"))
-            replylen = 19;
-        else if (!strcmp(rawcmd.c_str(), "QFLAG"))
-            replylen = 15;
-        else if (!strcmp(rawcmd.c_str(), "QBOOT"))
-            replylen = 5;
-        else if (!strcmp(rawcmd.c_str(), "QOPM"))
-            replylen = 6;
-        else replylen = 7;
-        ups->ExecuteCmd(rawcmd, replylen);
+        ups->ExecuteCmd(rawcmd);
         // We're piggybacking off the qpri status response...
         printf("Reply:  %s\n", ups->GetQpiriStatus()->c_str());
         exit(0);
@@ -231,7 +206,7 @@ int main(int argc, char* argv[]) {
             if (reply1 && reply2 && warnings) {
 
                 // Parse and display values
-                sscanf(reply1->c_str(), "%f %f %f %f %d %d %d %d %f %d %d %d %f %f %f %d %s", &voltage_grid, &freq_grid, &voltage_out, &freq_out, &load_va, &load_watt, &load_percent, &voltage_bus, &voltage_batt, &batt_charge_current, &batt_capacity, &temp_heatsink, &pv_input_current, &pv_input_voltage, &scc_voltage, &batt_discharge_current, &device_status);
+                sscanf(reply1->c_str(), "%f %f %f %f %d %d %d %d %f %d %d %d %f %f %f %d %s", &voltage_grid, &freq_grid, &voltage_out, &freq_out, &load_va, &load_watt, &load_percent, &voltage_bus, &voltage_batt, &batt_charge_current, &batt_capacity, &temp_heatsink, &pv_input_current, &pv_input_voltage, &scc_voltage, &batt_discharge_current, (char *)&device_status);
                 char parallel_max_num;
                 sscanf(reply2->c_str(), "%f %f %f %f %f %d %d %f %f %f %f %f %d %d %d %d %d %d %c %d %d %d %f",
                        &grid_voltage_rating, &grid_current_rating, &out_voltage_rating, &out_freq_rating, &out_current_rating, &out_va_rating, &out_watt_rating, &batt_rating, &batt_recharge_voltage, &batt_under_voltage, &batt_bulk_voltage, &batt_float_voltage, &batt_type, &max_grid_charge_current, &max_charge_current, &in_voltage_range, &out_source_priority, &charger_source_priority, &parallel_max_num, &machine_type, &topology, &out_mode, &batt_redischarge_voltage);
