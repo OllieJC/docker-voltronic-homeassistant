@@ -9,7 +9,8 @@ RUN apt update && apt upgrade -y && apt install -y \
         mosquitto-clients \
         less \
         nano \
-        setserial
+        setserial \
+        pcregrep
 
 ADD sources/inverter-cli/ /opt/inverter-cli/
 ADD config/ /etc/inverter/

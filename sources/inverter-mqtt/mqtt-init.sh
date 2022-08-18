@@ -60,7 +60,7 @@ registerTopic "QPIGS_raw" "" "about" "" ""
 registerTopic "QPIRI_raw" "" "about" "" ""
 registerTopic "Q1_raw" "" "about" "" ""
 registerTopic "QMOD_raw" "" "about" "" ""
-registerTopic "Warnings" "" "about" "" ""
+registerTopic "QPIWS_raw" "" "about" "" ""
 registerTopic "Inverter_mode" "" "solar-power" "" "" # 1 = Power_On, 2 = Standby, 3 = Line, 4 = Battery, 5 = Fault, 6 = Power_Saving, 7 = Unknown
 registerTopic "AC_grid_voltage" "V" "power-plug" "voltage" ""
 registerTopic "AC_grid_frequency" "Hz" "current-ac" "frequency" ""

@@ -36,6 +36,7 @@ pushMQTTData () {
         -P "$MQTT_PASSWORD" \
         -i "$MQTT_CLIENTID" \
         -t "${MQTT_TOPIC}/${ENTITY_TYPE}/${MQTT_DEVICENAME}_$1" \
+        --qos 0 \
         -m "$MSG"
 
     if [[ "$INFLUX_ENABLED" == "true" ]] ; then
@@ -62,7 +63,8 @@ getJSONValue () {
     if [ -z "$2" ]; then
       echo ""
     else
-      VAL=$(echo "$1" | jq ".$2" -r | tr -d "\n")
+      VAL=$(echo "$1" | pcregrep -o1 "\"$2\":\s*\"?(.*?)\s*[\",]")
+      # VAL=$(echo "$1" | jq ".$2" -r | tr -d "\n")
       if [ -n "$VAL" ]; then
         if [ "$VAL" == "null" ]; then
           echo ""
@@ -91,7 +93,7 @@ pushJSONValue () {
         else
           FIELD="$2"
         fi
-        pushMQTTData "$FIELD" "$VAL" "" "$4"
+        pushMQTTData "$FIELD" "$VAL" "$4"
       fi
 
     fi
@@ -164,10 +166,7 @@ handleJson () {
 
 /opt/inverter-cli/bin/inverter_poller | while read -r rawjson; do
   if [ -n "$rawjson" ]; then
-    JSON=$(echo "$rawjson" | jq)
-    if [ -n "$JSON" ]; then
-      handleJson "$JSON"
-    fi
+    handleJson "$rawjson"
   fi
 done
 

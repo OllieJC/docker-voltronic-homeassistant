@@ -31,17 +31,18 @@ else
   echo "mqtt-init.sh is already running"
 fi
 
+if [[ -z "$(pgrep -f 'mqtt-push')" ]]; then
+  echo "mqtt-push.sh not running, starting..."
+  /opt/inverter-mqtt/mqtt-push.sh &
+else
+  echo "mqtt-push.sh is already running"
+fi
+
 # Run the MQTT Subscriber process in the background (so that way we can change the configuration on the inverter from home assistant)
 if [[ -z "$(pgrep -f mosquitto_sub)" ]]; then
   echo "mqtt-subscriber.sh (mosquitto_sub) not running, starting..."
-  /opt/inverter-mqtt/mqtt-subscriber.sh &
+  /opt/inverter-mqtt/mqtt-subscriber.sh
 else
   echo "mqtt-subscriber.sh (mosquitto_sub) is already running"
 fi
 
-if [[ -z "$(pgrep -f 'inverter_poller')" ]]; then
-  echo "mqtt-push.sh (inverter_poller) not running, starting..."
-  /opt/inverter-mqtt/mqtt-push.sh
-else
-  echo "mqtt-push.sh (inverter_poller) is already running"
-fi
