@@ -9,50 +9,17 @@
 
 cInverter::cInverter(std::string devicename) {
     device = devicename;
-    status1[0] = 0;
-    status2[0] = 0;
-    status3[0] = 0;
-    warnings[0] = 0;
-    mode = 0;
+    rawCmdReply[0] = 0;
 }
 
-string *cInverter::GetQpigsStatus() {
+string *cInverter::GetReply() {
     m.lock();
-    string *result = new string(status1);
+    string *result = new string(rawCmdReply);
     m.unlock();
     return result;
 }
 
-string *cInverter::GetQpiriStatus() {
-    m.lock();
-    string *result = new string(status2);
-    m.unlock();
-    return result;
-}
-
-string *cInverter::GetQOneStatus() {
-    m.lock();
-    string *result = new string(status3);
-    m.unlock();
-    return result;
-}
-
-string *cInverter::GetWarnings() {
-    m.lock();
-    string *result = new string(warnings);
-    m.unlock();
-    return result;
-}
-
-void cInverter::SetMode(char newmode) {
-    m.lock();
-    if (mode && newmode != mode)
-        ups_status_changed = true;
-    mode = newmode;
-    m.unlock();
-}
-
-int cInverter::GetMode() {
+int cInverter::GetMode(char mode) {
     int result;
     m.lock();
 
@@ -185,69 +152,11 @@ bool cInverter::query(const char *cmd) {
     }
 }
 
-void cInverter::poll() {
-    int n,j;
-    // extern const int qpiri, qpiws, qmod, qpigs;
-
-    while (true) {
-
-        // Reading mode
-        if (!ups_qmod_changed) {
-            if (query("QMOD")) {
-                SetMode(buf[1]);
-                ups_qmod_changed = true;
-            }
-        }
-
-        // reading status (QPIGS)
-        if (!ups_qpigs_changed) {
-            if (query("QPIGS")) {
-                m.lock();
-                strcpy(status1, (const char*)buf+1);
-                m.unlock();
-                ups_qpigs_changed = true;
-            }
-        }
-
-        // Reading QPIRI status
-        if (!ups_qpiri_changed) {
-            if (query("QPIRI")) {
-                m.lock();
-                strcpy(status2, (const char*)buf+1);
-                m.unlock();
-                ups_qpiri_changed = true;
-            }
-        }
-
-        // Reading Q1 status
-        if (!ups_qone_changed) {
-            if (query("Q1")) {
-                m.lock();
-                strcpy(status3, (const char*)buf+1);
-                m.unlock();
-                ups_qone_changed = true;
-            }
-        }
-
-        // Get any device warnings...
-        if (!ups_qpiws_changed) {
-            if (query("QPIWS")) {
-                m.lock();
-                strcpy(warnings, (const char*)buf+1);
-                m.unlock();
-                ups_qpiws_changed = true;
-            }
-        }
-
-        sleep(5);
-    }
-}
-
 void cInverter::ExecuteCmd(const string cmd) {
     // Sending any command raw
     if (query(cmd.data())) {
         m.lock();
-        strcpy(status2, (const char*)buf+1);
+        strcpy(rawCmdReply, (const char*)buf+1);
         m.unlock();
     }
 }

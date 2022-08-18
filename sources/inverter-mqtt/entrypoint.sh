@@ -39,11 +39,9 @@ else
   echo "mqtt-subscriber.sh (mosquitto_sub) is already running"
 fi
 
-# execute exactly every 30 seconds...
-# watch -n 30 /opt/inverter-mqtt/mqtt-push.sh > /dev/null 2>&1
-if [[ -z "$(pgrep -f 'watch.*mqtt-push')" ]]; then
-  echo "mqtt-push not running, starting..."
-  watch -n 10 /opt/inverter-mqtt/mqtt-push.sh > /dev/null 2>&1
+if [[ -z "$(pgrep -f 'inverter_poller')" ]]; then
+  echo "mqtt-push.sh (inverter_poller) not running, starting..."
+  /opt/inverter-mqtt/mqtt-push.sh
 else
-  echo "mqtt-push.sh is already running"
+  echo "mqtt-push.sh (inverter_poller) is already running"
 fi

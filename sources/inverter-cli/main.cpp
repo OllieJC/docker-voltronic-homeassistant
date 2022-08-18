@@ -29,15 +29,6 @@ bool runOnce = false;
 
 cInverter *ups = NULL;
 
-atomic_bool ups_status_changed(false);
-atomic_bool ups_qmod_changed(false);
-atomic_bool ups_qpiri_changed(false);
-atomic_bool ups_qpigs_changed(false);
-atomic_bool ups_qpiws_changed(false);
-atomic_bool ups_qone_changed(false);
-atomic_bool ups_cmd_executed(false);
-
-
 // ---------------------------------------
 // Global configs read from 'inverter.conf'
 
@@ -147,7 +138,7 @@ int main(int argc, char* argv[]) {
     int in_voltage_range;
     int out_source_priority;
     int charger_source_priority;
-    char parallel_max_num;
+    int parallel_max_num;
     int machine_type;
     int topology;
     int out_mode;
@@ -175,144 +166,192 @@ int main(int argc, char* argv[]) {
         getSettingsFile("/etc/inverter/inverter.conf");
     }
 
-    bool ups_status_changed(false);
     ups = new cInverter(devicename);
 
     // Logic to send 'raw commands' to the inverter..
     if (!rawcmd.empty()) {
         ups->ExecuteCmd(rawcmd);
-        // We're piggybacking off the qpri status response...
-        printf("Reply:  %s\n", ups->GetQpiriStatus()->c_str());
-        exit(0);
-    } else {
-        ups->runMultiThread();
-    }
+        string *rawCmdReply = ups->GetReply();
 
-    while (true) {
-        if (ups_status_changed) {
-            int mode = ups->GetMode();
-
-            if (mode)
-                lprintf("INVERTER: Mode Currently set to: %d", mode);
-
-            ups_status_changed = false;
+        if (rawCmdReply) {
+            printf("Reply: %s\n", rawCmdReply->c_str());
+        } else {
+            printf("Reply: NONE\n");
         }
 
-        if (ups_qmod_changed && ups_qpiri_changed && ups_qpigs_changed && ups_qpiws_changed && ups_qone_changed) {
+        exit(0);
+    }
+    //  else {
+    //    ups->runMultiThread();
+    //}
 
-            ups_qmod_changed = false;
-            ups_qpiri_changed = false;
-            ups_qpigs_changed = false;
-            ups_qpiws_changed = false;
-            ups_qone_changed = false;
+    while (true) {
+        int mode = 0;
 
-            int mode = ups->GetMode();
-            string *reply1   = ups->GetQpigsStatus();
-            string *reply2   = ups->GetQpiriStatus();
-            string *reply3   = ups->GetQOneStatus();
-            string *warnings = ups->GetWarnings();
+        ups->ExecuteCmd("QMOD");
+        string *rawMode = ups->GetReply();
+        if (rawMode) {
+             mode = ups->GetMode(rawMode->c_str()[0]);
 
-            if (reply1 && reply2 && warnings) {
+             printf("{");
+             printf("\"type\":\"QMOD\",");
+             printf("\"raw\":\"%s\",", rawMode->c_str());
+             printf("\"Inverter_mode\":%d", mode);
+             printf("}\n");
 
-                // Parse and display values
-                sscanf(reply1->c_str(), "%f %f %f %f %d %d %d %d %f %d %d %d %f %f %f %d %s %d %d %f %s", &voltage_grid, &freq_grid, &voltage_out, &freq_out, &load_va, &load_watt, &load_percent, &voltage_bus, &voltage_batt, &batt_charge_current, &batt_capacity, &temp_heatsink, &pv_input_current, &pv_input_voltage, &scc_voltage, &batt_discharge_current, (char *)&device_status, &fan_voltage_offset, &eeprom_version, &pv_charging_power, (char *)&device_status_2);
-                sscanf(reply2->c_str(), "%f %f %f %f %f %d %d %f %f %f %f %f %d %d %d %d %d %d %c %d %d %d %f",
-                       &grid_voltage_rating, &grid_current_rating, &out_voltage_rating, &out_freq_rating, &out_current_rating, &out_va_rating, &out_watt_rating, &batt_rating, &batt_recharge_voltage, &batt_under_voltage, &batt_bulk_voltage, &batt_float_voltage, &batt_type, &max_grid_charge_current, &max_charge_current, &in_voltage_range, &out_source_priority, &charger_source_priority, &parallel_max_num, &machine_type, &topology, &out_mode, &batt_redischarge_voltage);
+             fflush(stdout);
 
-                // There appears to be a discrepancy in actual DMM measured current vs what the meter is
-                // telling me it's getting, so lets add a variable we can multiply/divide by to adjust if
-                // needed.  This should be set in the config so it can be changed without program recompile.
-                if (debugFlag) {
-                    printf("INVERTER: ampfactor from config is %.2f\n", ampfactor);
-                    printf("INVERTER: wattfactor from config is %.2f\n", wattfactor);
-                }
+             delete rawMode;
+        }
 
-                pv_input_current = pv_input_current * ampfactor;
+        ups->ExecuteCmd("QPIGS");
+        string *rawQpigs = ups->GetReply();
+        if (rawQpigs) {
+            sscanf(rawQpigs->c_str(), "%f %f %f %f %d %d %d %d %f %d %d %d %f %f %f %d %s %d %d %f %s", &voltage_grid, &freq_grid, &voltage_out, &freq_out, &load_va, &load_watt, &load_percent,
+              &voltage_bus, &voltage_batt, &batt_charge_current, &batt_capacity, &temp_heatsink, &pv_input_current, &pv_input_voltage, &scc_voltage, &batt_discharge_current,
+              (char *)&device_status, &fan_voltage_offset, &eeprom_version, &pv_charging_power, (char *)&device_status_2);
 
-                // It appears on further inspection of the documentation, that the input current is actually
-                // current that is going out to the battery at battery voltage (NOT at PV voltage).  This
-                // would explain the larger discrepancy we saw before.
-
-                pv_input_watts = (pv_input_voltage * pv_input_current) * wattfactor;
-
-                // Calculate watt-hours generated per run interval period (given as program argument)
-                pv_input_watthour = pv_input_watts / (3600 / runinterval);
-                load_watthour = (float)load_watt / (3600 / runinterval);
-
-                // Print as JSON (output is expected to be parsed by another tool...)
-                printf("{\n");
-
-                printf("  \"QPIGS_raw\":\"%s\",\n", reply1->c_str());
-                printf("  \"QPIRI_raw\":\"%s\",\n", reply2->c_str());
-
-                if (reply3) {
-                    printf("  \"Q1_raw\":\"%s\",\n", reply3->c_str());
-                }
-
-                printf("  \"Inverter_mode\":%d,\n", mode);
-                printf("  \"AC_grid_voltage\":%.1f,\n", voltage_grid);
-                printf("  \"AC_grid_frequency\":%.1f,\n", freq_grid);
-                printf("  \"AC_out_voltage\":%.1f,\n", voltage_out);
-                printf("  \"AC_out_frequency\":%.1f,\n", freq_out);
-                printf("  \"PV_in_voltage\":%.2f,\n", pv_input_voltage);
-                printf("  \"PV_in_current\":%.2f,\n", pv_input_current);
-                printf("  \"PV_in_watts\":%.2f,\n", pv_input_watts);
-                printf("  \"PV_charging_power\":%.1f,\n", pv_charging_power);
-                printf("  \"PV_in_watthour\":%.4f,\n", pv_input_watthour);
-                printf("  \"SCC_voltage\":%.4f,\n", scc_voltage);
-                printf("  \"Load_pct\":%d,\n", load_percent);
-                printf("  \"Load_watt\":%d,\n", load_watt);
-                printf("  \"Load_watthour\":%.4f,\n", load_watthour);
-                printf("  \"Load_va\":%d,\n", load_va);
-                printf("  \"Bus_voltage\":%d,\n", voltage_bus);
-                printf("  \"Heatsink_temperature\":%d,\n", temp_heatsink);
-                printf("  \"Battery_capacity\":%d,\n", batt_capacity);
-                printf("  \"Battery_voltage\":%.2f,\n", voltage_batt);
-                printf("  \"Battery_charge_current\":%d,\n", batt_charge_current);
-                printf("  \"Battery_discharge_current\":%d,\n", batt_discharge_current);
-                printf("  \"Load_status_on\":%c,\n", device_status[3]);
-                printf("  \"SCC_charge_on\":%c,\n", device_status[6]);
-                printf("  \"AC_charge_on\":%c,\n", device_status[7]);
-                printf("  \"Floating_mode\":%c,\n", device_status_2[0]);
-                printf("  \"Switch_on\":%c,\n", device_status_2[1]);
-                printf("  \"Reserved_flag\":%c,\n", device_status_2[2]);
-                printf("  \"Fan_voltage_offset\":%d,\n", fan_voltage_offset);
-                printf("  \"EEPROM_version\":%d,\n", eeprom_version);
-                printf("  \"Battery_recharge_voltage\":%.1f,\n", batt_recharge_voltage);
-                printf("  \"Battery_under_voltage\":%.1f,\n", batt_under_voltage);
-                printf("  \"Battery_bulk_voltage\":%.1f,\n", batt_bulk_voltage);
-                printf("  \"Battery_float_voltage\":%.1f,\n", batt_float_voltage);
-                printf("  \"Max_grid_charge_current\":%d,\n", max_grid_charge_current);
-                printf("  \"Parallel_max_num\":%c,\n", parallel_max_num);
-                printf("  \"Max_charge_current\":%d,\n", max_charge_current);
-                printf("  \"Out_source_priority\":%d,\n", out_source_priority);
-                printf("  \"Charger_source_priority\":%d,\n", charger_source_priority);
-                printf("  \"Battery_redischarge_voltage\":%.1f,\n", batt_redischarge_voltage);
-
-                if (warnings) {
-                    printf("  \"Warnings\":\"%s\"\n", warnings->c_str());
-                    delete warnings;
-                }
-
-                printf("}\n");
-
-                // Delete reply string so we can update with new data when polled again...
-                delete reply1;
-                delete reply2;
-                delete reply3;
-
-                if(runOnce) {
-                    // Do once and exit instead of loop endlessly
-                    lprintf("INVERTER: All queries complete, exiting loop.");
-                    exit(0);
-                }
+            // There appears to be a discrepancy in actual DMM measured current vs what the meter is
+            // telling me it's getting, so lets add a variable we can multiply/divide by to adjust if
+            // needed.  This should be set in the config so it can be changed without program recompile.
+            if (debugFlag) {
+                printf("INVERTER: ampfactor from config is %.2f\n", ampfactor);
+                printf("INVERTER: wattfactor from config is %.2f\n", wattfactor);
             }
+
+            pv_input_current = pv_input_current * ampfactor;
+
+            // It appears on further inspection of the documentation, that the input current is actually
+            // current that is going out to the battery at battery voltage (NOT at PV voltage).  This
+            // would explain the larger discrepancy we saw before.
+
+            pv_input_watts = (pv_input_voltage * pv_input_current) * wattfactor;
+
+            // Calculate watt-hours generated per run interval period (given as program argument)
+            pv_input_watthour = pv_input_watts / (3600 / runinterval);
+            load_watthour = (float)load_watt / (3600 / runinterval);
+
+            printf("{");
+
+            printf("\"type\":\"QPIGS\",");
+            printf("\"raw\":\"%s\",", rawQpigs->c_str());
+            printf("\"AC_grid_voltage\":%.1f,", voltage_grid);
+            printf("\"AC_grid_frequency\":%.1f,", freq_grid);
+            printf("\"AC_out_voltage\":%.1f,", voltage_out);
+            printf("\"AC_out_frequency\":%.1f,", freq_out);
+            printf("\"PV_in_voltage\":%.2f,", pv_input_voltage);
+            printf("\"PV_in_current\":%.2f,", pv_input_current);
+            printf("\"PV_in_watts\":%.2f,", pv_input_watts);
+            printf("\"PV_charging_power\":%.1f,", pv_charging_power);
+            printf("\"PV_in_watthour\":%.4f,", pv_input_watthour);
+            printf("\"SCC_voltage\":%.4f,", scc_voltage);
+            printf("\"Load_pct\":%d,", load_percent);
+            printf("\"Load_watt\":%d,", load_watt);
+            printf("\"Load_watthour\":%.4f,", load_watthour);
+            printf("\"Load_va\":%d,", load_va);
+            printf("\"Bus_voltage\":%d,", voltage_bus);
+            printf("\"Heatsink_temperature\":%d,", temp_heatsink);
+            printf("\"Battery_capacity\":%d,", batt_capacity);
+            printf("\"Battery_voltage\":%.2f,", voltage_batt);
+            printf("\"Battery_charge_current\":%d,", batt_charge_current);
+            printf("\"Battery_discharge_current\":%d,", batt_discharge_current);
+            printf("\"Load_status_on\":%c,", device_status[3]);
+            printf("\"SCC_charge_on\":%c,", device_status[6]);
+            printf("\"AC_charge_on\":%c,", device_status[7]);
+            printf("\"Floating_mode\":%c,", device_status_2[0]);
+            printf("\"Switch_on\":%c,", device_status_2[1]);
+            printf("\"Reserved_flag\":%c,", device_status_2[2]);
+            printf("\"Fan_voltage_offset\":%d,", fan_voltage_offset);
+            printf("\"EEPROM_version\":%d", eeprom_version);
+
+            printf("}\n");
+
+            fflush(stdout);
+            delete rawQpigs;
+        }
+
+        ups->ExecuteCmd("QPIRI");
+        string *rawQpiri = ups->GetReply();
+        if (rawQpiri) {
+
+            sscanf(rawQpiri->c_str(), "%f %f %f %f %f %d %d %f %f %f %f %f %d %d %d %d %d %d %d %d %d %d %f",
+              &grid_voltage_rating, &grid_current_rating, &out_voltage_rating, &out_freq_rating, &out_current_rating, &out_va_rating, &out_watt_rating,
+              &batt_rating, &batt_recharge_voltage, &batt_under_voltage, &batt_bulk_voltage, &batt_float_voltage, &batt_type, &max_grid_charge_current,
+              &max_charge_current, &in_voltage_range, &out_source_priority, &charger_source_priority, &parallel_max_num, &machine_type, &topology,
+              &out_mode, &batt_redischarge_voltage);
+
+            printf("{");
+
+            printf("\"type\":\"QPIRI\",");
+            printf("\"raw\":\"%s\",", rawQpiri->c_str());
+            printf("\"Battery_recharge_voltage\":%.1f,", batt_recharge_voltage);
+            printf("\"Battery_under_voltage\":%.1f,", batt_under_voltage);
+            printf("\"Battery_bulk_voltage\":%.1f,", batt_bulk_voltage);
+            printf("\"Battery_float_voltage\":%.1f,", batt_float_voltage);
+            printf("\"Max_grid_charge_current\":%d,", max_grid_charge_current);
+            printf("\"Parallel_max_num\":%d,", parallel_max_num);
+            printf("\"Max_charge_current\":%d,", max_charge_current);
+            printf("\"Out_source_priority\":%d,", out_source_priority);
+            printf("\"Charger_source_priority\":%d,", charger_source_priority);
+            printf("\"Battery_redischarge_voltage\":%.1f", batt_redischarge_voltage);
+
+            printf("}\n");
+
+            fflush(stdout);
+            delete rawQpiri;
+        }
+
+        ups->ExecuteCmd("Q1");
+        string *rawQ1 = ups->GetReply();
+        if (rawQ1) {
+            //sscanf(rawQpiws->c_str(), "%f %f %f %f %f %d %d %f %f %f %f %f %d %d %d %d %d %d %d %d %d %d %f",
+            //  &grid_voltage_rating, &grid_current_rating, &out_voltage_rating, &out_freq_rating, &out_current_rating, &out_va_rating, &out_watt_rating,
+            //  &batt_rating, &batt_recharge_voltage, &batt_under_voltage, &batt_bulk_voltage, &batt_float_voltage, &batt_type, &max_grid_charge_current,
+            //  &max_charge_current, &in_voltage_range, &out_source_priority, &charger_source_priority, &parallel_max_num, &machine_type, &topology,
+            //  &out_mode, &batt_redischarge_voltage);
+
+            printf("{");
+
+            printf("\"type\":\"Q1\",");
+            printf("\"raw\":\"%s\"", rawQ1->c_str());
+
+            printf("}\n");
+
+            fflush(stdout);
+            delete rawQ1;
+        }
+
+        ups->ExecuteCmd("QPIWS");
+        string *rawQpiws = ups->GetReply();
+        if (rawQpiws) {
+            //sscanf(rawQpiws->c_str(), "%f %f %f %f %f %d %d %f %f %f %f %f %d %d %d %d %d %d %d %d %d %d %f",
+            //  &grid_voltage_rating, &grid_current_rating, &out_voltage_rating, &out_freq_rating, &out_current_rating, &out_va_rating, &out_watt_rating,
+            //  &batt_rating, &batt_recharge_voltage, &batt_under_voltage, &batt_bulk_voltage, &batt_float_voltage, &batt_type, &max_grid_charge_current,
+            //  &max_charge_current, &in_voltage_range, &out_source_priority, &charger_source_priority, &parallel_max_num, &machine_type, &topology,
+            //  &out_mode, &batt_redischarge_voltage);
+
+            printf("{");
+
+            printf("\"type\":\"QPIWS\",");
+            printf("\"raw\":\"%s\"", rawQpiws->c_str());
+
+            printf("}\n");
+
+            fflush(stdout);
+            delete rawQpiws;
+        }
+
+        if(runOnce) {
+            // Do once and exit instead of loop endlessly
+            lprintf("INVERTER: All queries complete, exiting loop.");
+            exit(0);
         }
 
         sleep(1);
     }
 
-    if (ups)
+    if (ups) {
         delete ups;
+    }
     return 0;
 }

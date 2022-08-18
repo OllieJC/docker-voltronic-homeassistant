@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 set -e
 
-exit
+INSTALL_PATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
-INSTALL_PATH="/opt/ha-inverter-mqtt-agent"
+if [[ -f "${INSTALL_PATH}/pause" ]]; then
+  echo "${INSTALL_PATH}/pause found, exiting"
+  exit 0
+fi
 
 if [[ ! -f "${INSTALL_PATH}/config/mqtt.json" ]]; then
   echo "${INSTALL_PATH}/config/mqtt.json not found, check it exists and that the INSTALL_PATH in start.sh is correct"

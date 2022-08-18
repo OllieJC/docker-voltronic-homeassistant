@@ -22,6 +22,4 @@ if [ "$(systemctl is-active docker)" = "active" ]; then
     echo "$CONTAINER_NAME is not running."
   fi
 
-else
-  echo "docker isn't started yet, attempting to start it for the next run..."
 fi

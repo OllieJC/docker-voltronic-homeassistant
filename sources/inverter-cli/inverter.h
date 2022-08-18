@@ -8,17 +8,11 @@ using namespace std;
 
 class cInverter {
     unsigned char buf[1024]; //internal work buffer
-
-    char warnings[1024];
-    char status1[1024];
-    char status2[1024];
-    char status3[1024];
-    char mode;
+    char rawCmdReply[1024];
 
     std::string device;
     std::mutex m;
 
-    void SetMode(char newmode);
     bool CheckCRC(unsigned char *buff, int len);
     bool query(const char *cmd);
     uint16_t cal_crc_half(uint8_t *pin, uint8_t len);
@@ -31,12 +25,9 @@ class cInverter {
             t1.detach();
         }
 
-        string *GetQpiriStatus();
-        string *GetQpigsStatus();
-        string *GetQOneStatus();
-        string *GetWarnings();
+        string *GetReply();
 
-        int GetMode();
+        int GetMode(const char mode);
         void ExecuteCmd(const std::string cmd);
 };
 
