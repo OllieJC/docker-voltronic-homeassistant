@@ -20,8 +20,8 @@ do
     if [ "$CURRENT_CMD" != "$rawcmd" ]; then
         echo "Incoming request send: [$rawcmd] to inverter."
 
-        echo "Killing any running inverter_poller"
-        pgrep -f "inverter_poller|mqtt-push" | xargs kill -s 9
+        echo "Killing any running mqtt-push"
+        pkill -f "mqtt-push" || echo "Kill failed."
         sleep 3s
 
         echo "Sending: [$rawcmd] to inverter."
