@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -e
 
-PROC=$(pgrep -fia "watch.*mqtt-init|mosquitto_sub|inverter_poller|mqtt-push" | cut -d ' ' -f2- | sort -u | uniq | wc -l)
+PROC=$(pgrep -fia "watch.*mqtt-init|mosquitto_sub|inverter_poller" | cut -d ' ' -f2- | sort -u | uniq | wc -l)
 
-if [ "$PROC" -eq "4" ]; then
+if [ "$PROC" -eq "3" ]; then
     exit 0
 else
     exit 99

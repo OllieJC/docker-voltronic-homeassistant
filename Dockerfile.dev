@@ -22,10 +22,10 @@ ADD sources/healthcheck /opt/
 ADD sources/inverter-mqtt/ /opt/inverter-mqtt/
 
 HEALTHCHECK \
-    --interval=20s \
-    --timeout=3s \
-    --start-period=60s \
-    --retries=2 \
+    --interval=10s \
+    --timeout=6s \
+    --start-period=40s \
+    --retries=3 \
   CMD /opt/healthcheck
 
 WORKDIR /opt

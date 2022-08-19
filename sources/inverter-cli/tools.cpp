@@ -48,13 +48,14 @@ void lprintf(const char *format, ...) {
 }
 
 int print_help() {
-    printf("\nUSAGE:  ./inverter_poller <args> [-r <command>], [-h | --help], [-1 | --run-once]\n\n");
+    printf("\nUSAGE:  ./inverter_poller <args> [-r <command> | -c <cmd1>,<cmd2>,... | --commands <cmd1>,<cmd2>,...], [-h | --help], [-1 | --run-once]\n\n");
 
     printf("SUPPORTED ARGUMENTS:\n");
-    printf("          -r <raw-command>      TX 'raw' command to the inverter\n");
-    printf("          -h | --help           This Help Message\n");
-    printf("          -1 | --run-once       Runs one iteration on the inverter, and then exits\n");
-    printf("          -d                    Additional debugging\n\n");
+    printf("          -r <raw-command>                    'raw' command to send to the inverter\n");
+    printf("          -c | --commands <cmd1>,<cmd2>,...   CSV of commands to send to the inverter\n");
+    printf("          -h | --help                         This help message\n");
+    printf("          -1 | --run-once                     Runs one iteration on the inverter (default repeats)\n");
+    printf("          -d                                  Additional debugging\n\n");
 
     printf("RAW COMMAND EXAMPLES (see protocol manual for complete list):\n");
     printf("Set output source priority  POP00     (Utility first)\n");

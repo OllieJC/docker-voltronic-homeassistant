@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -e
+# set -e
 
 MQTT_JSON=$(cat /etc/inverter/mqtt.json)
 MQTT_SERVER=$(echo "$MQTT_JSON" | jq '.server' -r)

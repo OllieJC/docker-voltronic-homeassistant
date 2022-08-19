@@ -159,6 +159,7 @@ void cInverter::ExecuteCmd(const string cmd) {
         strcpy(rawCmdReply, (const char*)buf+1);
         m.unlock();
     }
+    sleep(0.1);
 }
 
 uint16_t cInverter::cal_crc_half(uint8_t *pin, uint8_t len) {

@@ -25,7 +25,7 @@ do
         sleep 3s
 
         echo "Sending: [$rawcmd] to inverter."
-        /opt/inverter-cli/bin/inverter_poller -r "$rawcmd"
+        /opt/inverter-cli/bin/inverter_poller -r "$rawcmd" -1
         sleep 1s
 
         CURRENT_CMD="$rawcmd"
